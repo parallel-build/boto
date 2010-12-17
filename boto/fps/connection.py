@@ -26,15 +26,17 @@ import xml.sax
 import uuid
 import boto
 import boto.utils
+
 from boto import handler
 from boto.connection import AWSQueryConnection
 from boto.resultset import ResultSet
 from boto.exception import FPSResponseError
-
+from boto.fps.result_types import Token
+from boto.fps.result_types import PayResponse
 class FPSConnection(AWSQueryConnection):
 
-    APIVersion = '2007-01-08'
-    SignatureVersion = '1'
+    APIVersion = '2008-09-17'
+    SignatureVersion = '2'
 
     def __init__(self, aws_access_key_id=None, aws_secret_access_key=None,
                  is_secure=True, port=None, proxy=None, proxy_port=None,
@@ -156,20 +158,20 @@ class FPSConnection(AWSQueryConnection):
         """
         params = {}
         params['SenderTokenId'] = senderTokenId
-        # this is for 2008-09-17 specification
-        #params['TransactionAmount.Value'] = str(transactionAmount)
-        #params['TransactionAmount.CurrencyCode'] = "USD"
-        params['TransactionAmount'] = str(transactionAmount)
+        params['TransactionAmount.Value'] = str(transactionAmount)
+        params['TransactionAmount.CurrencyCode'] = "USD"
+        #params['TransactionAmount.amount'] = str(transactionAmount)
         params['ChargeFeeTo'] = chargeFeeTo
         
         params['RecipientTokenId'] = (
             recipientTokenId if recipientTokenId is not None
             else boto.config.get("FPS", "recipient_token")
             )
-        params['CallerTokenId'] = (
-            callerTokenId if callerTokenId is not None
-            else boto.config.get("FPS", "caller_token")
-            )
+        # not needed for API version 2008-09-17
+        #params['CallerTokenId'] = (
+        #    callerTokenId if callerTokenId is not None
+        #    else boto.config.get("FPS", "caller_token")
+        #    )
         if(transactionDate != None):
             params['TransactionDate'] = transactionDate
         if(senderReference != None):
@@ -194,10 +196,10 @@ class FPSConnection(AWSQueryConnection):
             response = self.make_request("Pay", params)
         body = response.read()
         if(response.status == 200):
-            rs = ResultSet()
-            h = handler.XmlHandler(rs, self)
+            r = PayResponse()
+            h = handler.XmlHandler(r, self)
             xml.sax.parseString(body, h)
-            return rs
+            return r
         else:
             raise FPSResponseError(response.status, response.reason, body)
     
@@ -300,20 +302,20 @@ class FPSConnection(AWSQueryConnection):
         Returns details about the token specified by 'callerReference'.
         """
         params ={}
-        params['callerReference'] = callerReference
+        params['CallerReference'] = callerReference
         
         response = self.make_request("GetTokenByCaller", params)
         body = response.read()
         if(response.status == 200):
-            rs = ResultSet()
-            h = handler.XmlHandler(rs, self)
+            t = Token(self)
+            h = handler.XmlHandler(t, self)
             xml.sax.parseString(body, h)
-            return rs
+            return t
         else:
             raise FPSResponseError(response.status, response.reason, body)
     def get_token_by_caller_token(self, tokenId):
         """
-        Returns details about the token specified by 'callerReference'.
+        Returns details about the token specified by 'tokenId'.
         """
         params ={}
         params['TokenId'] = tokenId
@@ -321,10 +323,10 @@ class FPSConnection(AWSQueryConnection):
         response = self.make_request("GetTokenByCaller", params)
         body = response.read()
         if(response.status == 200):
-            rs = ResultSet()
-            h = handler.XmlHandler(rs, self)
+            t = Token(self)
+            h = handler.XmlHandler(t, self)
             xml.sax.parseString(body, h)
-            return rs
+            return t
         else:
             raise FPSResponseError(response.status, response.reason, body)
 
