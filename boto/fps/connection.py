@@ -33,6 +33,7 @@ from boto.resultset import ResultSet
 from boto.exception import FPSResponseError
 from boto.fps.result_types import Token
 from boto.fps.result_types import PayResponse
+from boto.fps.result_types import DebtBalanceResponse
 class FPSConnection(AWSQueryConnection):
 
     APIVersion = '2008-09-17'
@@ -151,12 +152,11 @@ class FPSConnection(AWSQueryConnection):
             chargeFeeTo="Recipient",
             callerReference=None, senderReference=None, recipientReference=None,
             senderDescription=None, recipientDescription=None, callerDescription=None,
-            metadata=None, transactionDate=None, reserve=False):
+            metadata=None, transactionDate=None, reserve=False, **params):
         """
         Make a payment transaction. You must specify the amount.
         This can also perform a Reserve request if 'reserve' is set to True.
         """
-        params = {}
         params['SenderTokenId'] = senderTokenId
         params['TransactionAmount.Value'] = str(transactionAmount)
         params['TransactionAmount.CurrencyCode'] = "USD"
@@ -239,6 +239,28 @@ class FPSConnection(AWSQueryConnection):
         else:
             raise FPSResponseError(response.status, response.reason, body)
     
+    def settle_debt(self, callerReference, creditInstrumentId, settlementTokenId, amount):
+        """
+        Settles debt on postpaid tokens
+        """
+        params = {}
+        params['CallerReference'] = callerReference
+        params['CreditInstrumentId'] = creditInstrumentId
+        params['SenderTokenId'] = settlementTokenId
+        params['SettlementAmount.Value'] = str(amount)
+        params['SettlementAmount.CurrencyCode'] = "USD"
+        
+        response = self.make_request("SettleDebt", params)
+        body = response.read()
+        if(response.status == 200):
+            r = PayResponse()
+            h = handler.XmlHandler(r, self)
+            xml.sax.parseString(body, h)
+            r
+        else:
+            raise FPSResponseError(response.status, response.reason, body)
+
+    
     def settle(self, reserveTransactionId, transactionAmount=None):
         """
         Charges for a reserved payment.
@@ -251,10 +273,11 @@ class FPSConnection(AWSQueryConnection):
         response = self.make_request("Settle", params)
         body = response.read()
         if(response.status == 200):
-            rs = ResultSet()
-            h = handler.XmlHandler(rs, self)
-            xml.sax.parseString(body, h)
-            return rs
+            print body
+            #rs = ResultSet()
+            #h = handler.XmlHandler(rs, self)
+            #xml.sax.parseString(body, h)
+            return None
         else:
             raise FPSResponseError(response.status, response.reason, body)
     
@@ -280,6 +303,25 @@ class FPSConnection(AWSQueryConnection):
         else:
             raise FPSResponseError(response.status, response.reason, body)
     
+
+    def view_debt(self, creditInstrumentId):
+        """
+        Returns debt incurred with creditInstrumentId.
+        """
+        params ={}
+        params['CreditInstrumentId'] = creditInstrumentId
+        response = self.make_request("GetDebtBalance", params)
+        body = response.read()
+        if(response.status == 200):
+            r = DebtBalanceResponse()
+            h = handler.XmlHandler(r, self)
+            xml.sax.parseString(body, h)
+            return r
+        else:
+            raise FPSResponseError(response.status, response.reason, body)
+
+
+
     def get_recipient_verification_status(self, recipientTokenId):
         """
         Test that the intended recipient has a verified Amazon Payments account.
@@ -307,7 +349,7 @@ class FPSConnection(AWSQueryConnection):
         response = self.make_request("GetTokenByCaller", params)
         body = response.read()
         if(response.status == 200):
-            t = Token(self)
+            t = Token()
             h = handler.XmlHandler(t, self)
             xml.sax.parseString(body, h)
             return t
@@ -323,7 +365,7 @@ class FPSConnection(AWSQueryConnection):
         response = self.make_request("GetTokenByCaller", params)
         body = response.read()
         if(response.status == 200):
-            t = Token(self)
+            t = Token()
             h = handler.XmlHandler(t, self)
             xml.sax.parseString(body, h)
             return t
