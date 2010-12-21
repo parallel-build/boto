@@ -113,4 +113,17 @@ class DebtBalanceResponse(FPSResponse):
 		elif name == "TransactionStatus":
 			self.transaction_status = value		
 
+class VerifySignatureResponse(FPSResponse):
+	def __init__(self):
+		FPSResponse.__init__(self)
+		self.response = None
+	def __repr__(self):
+		return 'VerifySignatureResponse'
+	def endElement(self, name, value, connection):
+		if name == "VerificationStatus":
+			self.response = value
+	def result(self):
+		return self.response == "Success"
+
+
 

@@ -34,6 +34,7 @@ from boto.exception import FPSResponseError
 from boto.fps.result_types import Token
 from boto.fps.result_types import PayResponse
 from boto.fps.result_types import DebtBalanceResponse
+from boto.fps.result_types import VerifySignatureResponse
 class FPSConnection(AWSQueryConnection):
 
     APIVersion = '2008-09-17'
@@ -381,7 +382,7 @@ class FPSConnection(AWSQueryConnection):
         body = response.read()
         if(response.status != 200):
             raise FPSResponseError(response.status, response.reason, body)
-        rs = ResultSet()
-        h = handler.XmlHandler(rs, self)
+        r = VerifySignatureResponse()
+        h = handler.XmlHandler(r, self)
         xml.sax.parseString(body, h)
-        return rs
+        return r
