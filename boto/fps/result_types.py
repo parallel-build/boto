@@ -76,8 +76,6 @@ class Token(FPSResponse):
 			self.payment_reason = value
 		elif name == "PaymentReason":
 			self.payment_reason = value
-		else:
-			print name, value
 
 class PayResponse(FPSResponse):
 	def __init__(self):

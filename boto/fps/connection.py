@@ -274,7 +274,6 @@ class FPSConnection(AWSQueryConnection):
         response = self.make_request("Settle", params)
         body = response.read()
         if(response.status == 200):
-            print body
             #rs = ResultSet()
             #h = handler.XmlHandler(rs, self)
             #xml.sax.parseString(body, h)
