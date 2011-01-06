@@ -38,6 +38,7 @@ from boto.fps.result_types import VerifySignatureResponse
 class FPSConnection(AWSQueryConnection):
 
     APIVersion = '2008-09-17'
+
     SignatureVersion = '2'
 
     def __init__(self, aws_access_key_id=None, aws_secret_access_key=None,
@@ -49,6 +50,7 @@ class FPSConnection(AWSQueryConnection):
                                     is_secure, port, proxy, proxy_port,
                                     proxy_user, proxy_pass, host, debug,
                                     https_connection_factory, path)
+        self.cbui_endpoint = 'authorize.payments-sandbox.amazon.com' if 'sandbox' in host else 'authorize.payments.amazon.com'
     
     def install_payment_instruction(self, instruction, token_type="Unrestricted", transaction_id=None):
         """
@@ -113,6 +115,9 @@ class FPSConnection(AWSQueryConnection):
         else:
             raise FPSResponseError(response.status, response.reason, body)
 
+
+
+    
     def make_url(self, returnURL, paymentReason, pipelineName, **params):
         """
         Generate the URL with the signature required for a transaction
@@ -121,32 +126,29 @@ class FPSConnection(AWSQueryConnection):
         params['returnURL'] = str(returnURL)
         params['paymentReason'] = str(paymentReason)
         params['pipelineName'] = pipelineName
-
+        params['signatureMethod']='HmacSHA256'
+        params['signatureVersion'] = '2'
+        params['version'] = '2009-01-09'        
         if(not params.has_key('callerReference')):
             params['callerReference'] = str(uuid.uuid4())
 
-        deco = [(key.lower(),i,key) for i,key in enumerate(params.keys())]
-        deco.sort()
-        keys = [key for _,_,key in deco]
+        header = 'GET\n' + self.cbui_endpoint + '\n' + '/cobranded-ui/actions/start\n'
 
-        url = ''
-        canonical = ''
-        for k in keys:
-            url += "&%s=%s" % (k, urllib.quote_plus(str(params[k])))
-            canonical += "%s%s" % (k, str(params[k]))
-
-        url = "/cobranded-ui/actions/start?%s" % ( url[1:])
-        hmac = self.hmac.copy()
-        hmac.update(canonical)
+        # generate the signature here...
+        keys = sorted(params.keys())
+        pairs = []
+        for key in keys:
+            val = self.get_utf8_value(params[key])
+            pairs.append(urllib.quote(key, safe='') + '=' + urllib.quote(val, safe='-_~'))
+        qs = '&'.join(pairs)
+        toSign = header + qs
+        url = "/cobranded-ui/actions/start?%s" % (qs)
+        hmac = self.hmac_256.copy()
+        hmac.update(toSign)
         signature = urllib.quote_plus(base64.encodestring(hmac.digest()).strip())
+        
 
-        # use the sandbox authorization endpoint if we're using the
-        #  sandbox for API calls.
-        endpoint_host = 'authorize.payments.amazon.com'
-        if 'sandbox' in self.host:
-            endpoint_host = 'authorize.payments-sandbox.amazon.com'
-        fmt = "https://%(endpoint_host)s%(url)s&awsSignature=%(signature)s"
-        return fmt % vars()
+        return 'https://' + self.cbui_endpoint + url + '&signature=' + signature
 
     def pay(self, transactionAmount, senderTokenId,
             recipientTokenId=None, callerTokenId=None,
