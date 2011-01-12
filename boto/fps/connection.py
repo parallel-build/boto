@@ -35,9 +35,10 @@ from boto.fps.result_types import Token
 from boto.fps.result_types import PayResponse
 from boto.fps.result_types import DebtBalanceResponse
 from boto.fps.result_types import VerifySignatureResponse
+from boto.fps.result_types import TransactionStatusResponse
 class FPSConnection(AWSQueryConnection):
 
-    APIVersion = '2008-09-17'
+    APIVersion = '2010-08-28'
 
     SignatureVersion = '2'
 
@@ -52,72 +53,7 @@ class FPSConnection(AWSQueryConnection):
                                     https_connection_factory, path)
         self.cbui_endpoint = 'authorize.payments-sandbox.amazon.com' if 'sandbox' in host else 'authorize.payments.amazon.com'
     
-    def install_payment_instruction(self, instruction, token_type="Unrestricted", transaction_id=None):
-        """
-        InstallPaymentInstruction
-        instruction: The PaymentInstruction to send, for example: 
-        
-            MyRole=='Caller' orSay 'Roles do not match';
-        
-        token_type: Defaults to "Unrestricted"
-        transaction_id: Defaults to a new ID
-        """
-
-        if(transaction_id == None):
-            transaction_id = uuid.uuid4()
-        params = {}
-        params['PaymentInstruction'] = instruction
-        params['TokenType'] = token_type
-        params['CallerReference'] = transaction_id
-        response = self.make_request("InstallPaymentInstruction", params)
-        return response
-    
-    def install_caller_instruction(self, token_type="Unrestricted", transaction_id=None):
-        """
-        Set us up as a caller
-        This will install a new caller_token into the FPS section.
-        This should really only be called to regenerate the caller token.
-        """
-        response = self.install_payment_instruction("MyRole=='Caller';", token_type=token_type, transaction_id=transaction_id)
-        body = response.read()
-        if(response.status == 200):
-            rs = ResultSet()
-            h = handler.XmlHandler(rs, self)
-            xml.sax.parseString(body, h)
-            caller_token = rs.TokenId
-            try:
-                boto.config.save_system_option("FPS", "caller_token", caller_token)
-            except(IOError):
-                boto.config.save_user_option("FPS", "caller_token", caller_token)
-            return caller_token
-        else:
-            raise FPSResponseError(response.status, response.reason, body)
-
-    def install_recipient_instruction(self, token_type="Unrestricted", transaction_id=None):
-        """
-        Set us up as a Recipient
-        This will install a new caller_token into the FPS section.
-        This should really only be called to regenerate the recipient token.
-        """
-        response = self.install_payment_instruction("MyRole=='Recipient';", token_type=token_type, transaction_id=transaction_id)
-        body = response.read()
-        if(response.status == 200):
-            rs = ResultSet()
-            h = handler.XmlHandler(rs, self)
-            xml.sax.parseString(body, h)
-            recipient_token = rs.TokenId
-            try:
-                boto.config.save_system_option("FPS", "recipient_token", recipient_token)
-            except(IOError):
-                boto.config.save_user_option("FPS", "recipient_token", recipient_token)
-
-            return recipient_token
-        else:
-            raise FPSResponseError(response.status, response.reason, body)
-
-
-
-    
+   
     def make_url(self, returnURL, paymentReason, pipelineName, **params):
         """
         Generate the URL with the signature required for a transaction
@@ -163,32 +99,10 @@ class FPSConnection(AWSQueryConnection):
         params['SenderTokenId'] = senderTokenId
         params['TransactionAmount.Value'] = str(transactionAmount)
         params['TransactionAmount.CurrencyCode'] = "USD"
-        #params['TransactionAmount.amount'] = str(transactionAmount)
-        params['ChargeFeeTo'] = chargeFeeTo
-        
-        params['RecipientTokenId'] = (
-            recipientTokenId if recipientTokenId is not None
-            else boto.config.get("FPS", "recipient_token")
-            )
-        # not needed for API version 2008-09-17
-        #params['CallerTokenId'] = (
-        #    callerTokenId if callerTokenId is not None
-        #    else boto.config.get("FPS", "caller_token")
-        #    )
-        if(transactionDate != None):
-            params['TransactionDate'] = transactionDate
-        if(senderReference != None):
-            params['SenderReference'] = senderReference
-        if(recipientReference != None):
-            params['RecipientReference'] = recipientReference
         if(senderDescription != None):
             params['SenderDescription'] = senderDescription
-        if(recipientDescription != None):
-            params['RecipientDescription'] = recipientDescription
         if(callerDescription != None):
             params['CallerDescription'] = callerDescription
-        if(metadata != None):
-            params['MetaData'] = metadata
         if(callerReference == None):
             callerReference = uuid.uuid4()
         params['CallerReference'] = callerReference
@@ -216,10 +130,10 @@ class FPSConnection(AWSQueryConnection):
         response = self.make_request("GetTransactionStatus", params)
         body = response.read()
         if(response.status == 200):
-            rs = ResultSet()
-            h = handler.XmlHandler(rs, self)
+            r = TransactionStatusResponse()
+            h = handler.XmlHandler(r, self)
             xml.sax.parseString(body, h)
-            return rs
+            return r
         else:
             raise FPSResponseError(response.status, response.reason, body)
     
@@ -259,7 +173,7 @@ class FPSConnection(AWSQueryConnection):
             r = PayResponse()
             h = handler.XmlHandler(r, self)
             xml.sax.parseString(body, h)
-            r
+            return r
         else:
             raise FPSResponseError(response.status, response.reason, body)
 

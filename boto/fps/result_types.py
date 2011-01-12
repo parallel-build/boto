@@ -77,6 +77,7 @@ class Token(FPSResponse):
 		elif name == "PaymentReason":
 			self.payment_reason = value
 
+
 class PayResponse(FPSResponse):
 	def __init__(self):
 		FPSResponse.__init__(self)
@@ -90,6 +91,24 @@ class PayResponse(FPSResponse):
 		elif name == "TransactionStatus":
 			self.transaction_status = value		
 
+class TransactionStatusResponse(FPSResponse):
+	def __init__(self):
+		FPSResponse.__init__(self)
+		self.transaction_status = None
+		self.caller_reference = None
+		self.status_code = None
+		self.status_message = None
+	def __repr__(self):
+		return 'TransactionStatus(%s , %s , %s , %s)' %  (self.transaction_status, self.caller_reference, self.status_code, self.status_message)
+	def endElement(self, name, value, connection):
+		if name == "TransactionStatus":
+			self.transaction_status = value
+		if name == "CallerReference":
+			self.caller_reference = value
+		if name == "StatusCode":
+			self.status_code = value
+		if name == "StatusMessage":
+			self.status_message = value
 
 class DebtBalanceResponse(FPSResponse):
 	def __init__(self):
