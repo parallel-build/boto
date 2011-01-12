@@ -35,6 +35,7 @@ from boto.fps.result_types import Token
 from boto.fps.result_types import PayResponse
 from boto.fps.result_types import DebtBalanceResponse
 from boto.fps.result_types import VerifySignatureResponse
+from boto.fps.result_types import TransactionStatusResponse
 class FPSConnection(AWSQueryConnection):
 
     APIVersion = '2008-09-17'
@@ -216,10 +217,10 @@ class FPSConnection(AWSQueryConnection):
         response = self.make_request("GetTransactionStatus", params)
         body = response.read()
         if(response.status == 200):
-            rs = ResultSet()
-            h = handler.XmlHandler(rs, self)
+            r = TransactionStatusResponse()
+            h = handler.XmlHandler(r, self)
             xml.sax.parseString(body, h)
-            return rs
+            return r
         else:
             raise FPSResponseError(response.status, response.reason, body)
     
@@ -259,7 +260,7 @@ class FPSConnection(AWSQueryConnection):
             r = PayResponse()
             h = handler.XmlHandler(r, self)
             xml.sax.parseString(body, h)
-            r
+            return r
         else:
             raise FPSResponseError(response.status, response.reason, body)
 
